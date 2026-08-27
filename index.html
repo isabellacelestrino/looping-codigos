@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terminal Infinito</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #111820;
+    --panel-2: #0d131a;
+    --border: #26323e;
+    --border-soft: #1b232c;
+    --text: #dce4ec;
+    --text-dim: #64758a;
+    --text-faint: #3a4653;
+    --accent: #ffa94d;
+    --accent-strong: #ff8f1f;
+    --teal: #5fd8c4;
+    --violet: #a190ff;
+    --pink: #ff7aa8;
+    --live: #ff6a6a;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  .stage {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2vh 2vw;
+  }
+
+  .glow {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(60% 50% at 50% 38%, rgba(255, 169, 77, 0.10), transparent 70%),
+      radial-gradient(40% 35% at 78% 78%, rgba(95, 216, 196, 0.06), transparent 70%);
+    pointer-events: none;
+  }
+
+  .scanlines {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .hint {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    padding: 0.45rem 0.85rem;
+    border-radius: 999px;
+    opacity: 1;
+    transition: opacity 0.6s ease;
+    z-index: 5;
+  }
+  .hint.hide { opacity: 0; }
+
+  .terminal {
+    position: relative;
+    width: min(94vw, 1080px);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.02);
+    overflow: hidden;
+  }
+
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 1.1rem;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .dots { display: flex; gap: 7px; flex: 0 0 auto; }
+  .dots span {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--border);
+    opacity: 0.9;
+  }
+  .dots span:nth-child(1) { background: var(--accent); }
+  .dots span:nth-child(2) { background: var(--teal); }
+  .dots span:nth-child(3) { background: var(--violet); }
+
+  .tabs { display: flex; flex: 1 1 auto; min-width: 0; }
+  .tab {
+    display: flex; align-items: center; gap: 0.5rem;
+    background: var(--panel);
+    border: 1px solid var(--border-soft);
+    border-bottom: none;
+    padding: 0.35rem 0.8rem;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    min-width: 0;
+  }
+  .tab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: 0 0 auto; }
+  #filename { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .meta { display: flex; align-items: center; gap: 0.7rem; flex: 0 0 auto; }
+  .live {
+    display: flex; align-items: center; gap: 0.4rem;
+    font-size: 0.68rem; letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--live);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .chip {
+    --chip-color: var(--accent);
+    border: 1px solid var(--chip-color);
+    color: var(--chip-color);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 0.18rem 0.6rem;
+    border-radius: 999px;
+  }
+
+  .body {
+    display: flex;
+    gap: 1.1rem;
+    padding: 1.65rem 1.9rem;
+    min-height: 23.5em;
+    font-size: clamp(1rem, 0.82rem + 0.95vw, 1.5rem);
+    line-height: 1.62;
+  }
+
+  .gutter {
+    margin: 0;
+    text-align: right;
+    color: var(--text-faint);
+    border-right: 1px solid var(--border-soft);
+    padding-right: 1em;
+    user-select: none;
+    flex: 0 0 auto;
+    font: inherit;
+  }
+
+  .code {
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: pre;
+    tab-size: 4;
+    font: inherit;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+  }
+  .code.fade-out { opacity: 0; }
+
+  .tok-cmt { color: var(--text-dim); font-style: italic; }
+  .tok-str { color: var(--teal); }
+  .tok-num { color: var(--violet); }
+  .tok-kw { color: var(--accent); font-weight: 600; }
+  .tok-fn { color: var(--pink); }
+  .tok-pln { color: var(--text); }
+
+  .cursor {
+    display: inline-block;
+    color: var(--accent);
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.7rem 1.4rem;
+    border-top: 1px solid var(--border-soft);
+    background: var(--panel-2);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+  }
+
+  .dotsnav { display: flex; gap: 0.4rem; }
+  .dotsnav .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+  }
+  .dotsnav .dot.on {
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(255, 169, 77, 0.18);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .live-dot, .cursor { animation: none; }
+    .hint { transition: none; }
+    .code { transition: none; }
+  }
+
+  @media (max-width: 640px) {
+    .titlebar { flex-wrap: wrap; }
+    .body { padding: 1.2rem 1.1rem; }
+    .statusbar { flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="glow"></div>
+  <div class="scanlines"></div>
+  <div class="hint" id="hint">Tela cheia: pressione F11</div>
+
+  <div class="terminal">
+    <div class="titlebar">
+      <div class="dots"><span></span><span></span><span></span></div>
+      <div class="tabs">
+        <div class="tab">
+          <span class="tab-dot"></span>
+          <span id="filename">index.html</span>
+        </div>
+      </div>
+      <div class="meta">
+        <span class="live"><span class="live-dot"></span>LOOP&nbsp;&#8734;</span>
+        <span class="chip" id="langChip">HTML</span>
+      </div>
+    </div>
+
+    <div class="body">
+      <pre class="gutter" id="gutter">1</pre>
+      <pre class="code" id="code"></pre>
+    </div>
+
+    <div class="statusbar">
+      <span>SENAC &middot; Casa Aberta &middot; Oficina de Programa&ccedil;&atilde;o</span>
+      <div class="dotsnav" id="dotsnav"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TOKEN_SPECS = {
+    html: [
+      { cls: "cmt", src: "<!--[\\s\\S]*?-->" },
+      { cls: "str", src: "\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'" },
+      { cls: "kw",  src: "</?[a-zA-Z][\\w-]*" },
+      { cls: "fn",  src: "[a-zA-Z-]+(?=\\s*=)" }
+    ],
+    css: [
+      { cls: "cmt", src: "/\\*[\\s\\S]*?\\*/" },
+      { cls: "str", src: "\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'" },
+      { cls: "num", src: "#[0-9a-fA-F]{3,8}\\b|\\b\\d+(?:\\.\\d+)?(?:px|rem|em|%|s|ms)?\\b" },
+      { cls: "fn",  src: "[.#]?[a-zA-Z][\\w-]*(?=\\s*\\{)" },
+      { cls: "kw",  src: "[a-zA-Z-]+(?=\\s*:)" }
+    ],
+    javascript: [
+      { cls: "cmt", src: "//.*|/\\*[\\s\\S]*?\\*/" },
+      { cls: "str", src: "\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'" },
+      { cls: "num", src: "\\b\\d+(?:\\.\\d+)?\\b" },
+      { cls: "kw",  src: "\\b(?:const|let|var|function|return|if|else|for|while|of|in|class|new|import|from|export|default|true|false|null|break|continue|async|await|try|catch|document|addEventListener)\\b" },
+      { cls: "fn",  src: "[a-zA-Z_]\\w*(?=\\()" }
+    ]
+  };
+
+  var SNIPPETS = [
+    {
+      file: "index.html",
+      lang: "html",
+      label: "HTML",
+      color: "--pink",
+      code: "<!-- index.html -->\n<!DOCTYPE html>\n<html lang=\"pt-br\">\n<head>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <section class=\"card\">\n    <h1>Oficina SENAC</h1>\n    <p>Casa Aberta - Programacao</p>\n    <button id=\"btn\">Clique aqui</button>\n  </section>\n  <script src=\"script.js\"><\/script>\n</body>\n</html>"
+    },
+    {
+      file: "style.css",
+      lang: "css",
+      label: "CSS",
+      color: "--violet",
+      code: "/* style.css */\nbody {\n  display: flex;\n  min-height: 100vh;\n  align-items: center;\n  justify-content: center;\n  background: #0b0f14;\n}\n\n.card {\n  padding: 2.5rem 3rem;\n  border-radius: 14px;\n  text-align: center;\n  color: #ffa94d;\n  background: #111820;\n}\n\nbutton {\n  padding: 0.6rem 1.4rem;\n  border-radius: 999px;\n  border: none;\n  cursor: pointer;\n}"
+    },
+    {
+      file: "script.js",
+      lang: "javascript",
+      label: "JAVASCRIPT",
+      color: "--teal",
+      code: "// script.js\nconst btn = document.getElementById(\"btn\");\nlet cliques = 0;\n\nbtn.addEventListener(\"click\", function () {\n  cliques++;\n  btn.textContent = \"Cliques: \" + cliques;\n});\n\nconsole.log(\"Oficina de Programacao - SENAC\");"
+    }
+  ];
+
+  var codeEl = document.getElementById("code");
+  var gutterEl = document.getElementById("gutter");
+  var filenameEl = document.getElementById("filename");
+  var chipEl = document.getElementById("langChip");
+  var dotsnavEl = document.getElementById("dotsnav");
+  var hintEl = document.getElementById("hint");
+
+  var prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var idx = -1;
+  var timer = null;
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function buildRegex(lang) {
+    var specs = TOKEN_SPECS[lang];
+    var pattern = specs.map(function (s) { return "(" + s.src + ")"; }).join("|");
+    return { re: new RegExp(pattern, "g"), classes: specs.map(function (s) { return s.cls; }) };
+  }
+
+  function tokenize(code, lang) {
+    var built = buildRegex(lang);
+    var re = built.re;
+    var classes = built.classes;
+    var tokens = [];
+    var last = 0;
+    var m;
+    while ((m = re.exec(code))) {
+      if (m.index > last) tokens.push({ t: code.slice(last, m.index), c: "pln" });
+      var cls = "pln";
+      for (var i = 0; i < classes.length; i++) {
+        if (m[i + 1] !== undefined) { cls = classes[i]; break; }
+      }
+      tokens.push({ t: m[0], c: cls });
+      last = re.lastIndex;
+    }
+    if (last < code.length) tokens.push({ t: code.slice(last), c: "pln" });
+    return tokens;
+  }
+
+  function renderUpTo(tokens, n) {
+    var out = "";
+    var remaining = n;
+    for (var i = 0; i < tokens.length; i++) {
+      if (remaining <= 0) break;
+      var tok = tokens[i];
+      var take = Math.min(remaining, tok.t.length);
+      out += '<span class="tok-' + tok.c + '">' + escapeHtml(tok.t.slice(0, take)) + "</span>";
+      remaining -= take;
+    }
+    return out;
+  }
+
+  function ensureDots() {
+    if (dotsnavEl.childElementCount) return;
+    SNIPPETS.forEach(function () {
+      var d = document.createElement("span");
+      d.className = "dot";
+      dotsnavEl.appendChild(d);
+    });
+  }
+
+  function updateDots() {
+    ensureDots();
+    Array.prototype.forEach.call(dotsnavEl.children, function (d, i) {
+      d.classList.toggle("on", i === idx);
+    });
+  }
+
+  function loadSnippet(s) {
+    filenameEl.textContent = s.file;
+    chipEl.textContent = s.label;
+    chipEl.style.setProperty("--chip-color", "var(" + s.color + ")");
+    updateDots();
+
+    var lineCount = s.code.split("\n").length;
+    var nums = [];
+    for (var i = 1; i <= lineCount; i++) nums.push(i);
+    gutterEl.textContent = nums.join("\n");
+
+    codeEl.classList.remove("fade-out");
+    var tokens = tokenize(s.code, s.lang);
+    var total = s.code.length;
+
+    if (prefersReduced) {
+      codeEl.innerHTML = renderUpTo(tokens, total);
+      timer = setTimeout(finishPause, 3600);
+      return;
+    }
+
+    var revealed = 0;
+    function tick() {
+      revealed++;
+      codeEl.innerHTML = renderUpTo(tokens, revealed) + '<span class="cursor">&#9615;</span>';
+      if (revealed < total) {
+        var ch = s.code[revealed - 1];
+        var delay = 16 + Math.random() * 26;
+        if (ch === "\n") delay = 140 + Math.random() * 160;
+        timer = setTimeout(tick, delay);
+      } else {
+        timer = setTimeout(finishPause, 3600);
+      }
+    }
+    tick();
+  }
+
+  function finishPause() {
+    if (!prefersReduced) codeEl.classList.add("fade-out");
+    timer = setTimeout(next, prefersReduced ? 60 : 320);
+  }
+
+  function next() {
+    idx = (idx + 1) % SNIPPETS.length;
+    loadSnippet(SNIPPETS[idx]);
+  }
+
+  setTimeout(function () { hintEl.classList.add("hide"); }, 6000);
+
+  next();
+})();
+</script>
+</body>
+</html>
